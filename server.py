@@ -148,7 +148,7 @@ async def _startup():
     # Import data from dump if collections are empty
     try:
         from import_data import import_data
-        await import_data(db)
+        await import_data(db_module.db)
     except Exception as e:
         logger.warning(f"Data import skipped: {e}")
 
