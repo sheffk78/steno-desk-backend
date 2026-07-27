@@ -25,7 +25,7 @@ from typing import Optional
 from fastapi import APIRouter, Request
 
 from auth_core import get_current_user
-from db import db, now_iso
+from db import get_db, now_iso
 from email_service import send_overdue_reminder_email
 from pdf_generator import generate_invoice_pdf
 

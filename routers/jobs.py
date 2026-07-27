@@ -5,7 +5,7 @@ from typing import List, Optional
 from fastapi import APIRouter, HTTPException, Query, Request
 
 from auth_core import get_current_user, require_active_subscription
-from db import db, now_iso
+from db import get_db, now_iso
 from models import JobIn, JobOut
 
 router = APIRouter()

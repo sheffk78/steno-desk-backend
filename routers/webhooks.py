@@ -14,7 +14,7 @@ import os
 
 from fastapi import APIRouter, HTTPException, Query, Request
 
-from db import db, now_iso
+from db import get_db, now_iso
 
 logger = logging.getLogger(__name__)
 router = APIRouter()

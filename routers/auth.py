@@ -16,7 +16,7 @@ from auth_core import (
     set_auth_cookies,
     verify_password,
 )
-from db import db, now_iso, strip
+from db import get_db, now_iso, strip
 from email_service import send_new_signup_notification, send_password_reset_email
 from models import ForgotIn, LoginIn, ResetIn, SettingsIn, SignupIn
 

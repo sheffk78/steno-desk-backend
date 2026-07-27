@@ -3,11 +3,31 @@ import os
 from datetime import datetime, timezone
 from typing import List
 
-from motor.motor_asyncio import AsyncIOMotorClient
+MONGO_URL = os.environ.get("MONGO_URL", "")
+DB_NAME = os.environ.get("DB_NAME", "steno_desk")
 
-mongo_url = os.environ["MONGO_URL"]
-mongo_client = AsyncIOMotorClient(mongo_url)
-db = mongo_client[os.environ["DB_NAME"]]
+# Lazy MongoDB connection — only connects when first accessed
+_mongo_client = None
+_db = None
+
+
+async def get_db():
+    """Get the database handle, connecting on first access."""
+    global _mongo_client, _db
+    if _db is not None:
+        return _db
+    if not MONGO_URL:
+        raise RuntimeError("MONGO_URL environment variable is not set")
+    from motor.motor_asyncio import AsyncIOMotorClient
+    _mongo_client = AsyncIOMotorClient(MONGO_URL)
+    _db = _mongo_client[DB_NAME]
+    return _db
+
+
+async def get_collection(name: str):
+    """Get a MongoDB collection by name, connecting lazily."""
+    db = await get_db()
+    return db[name]
 
 
 def now_iso() -> str:
@@ -33,12 +53,13 @@ def serialize_invoice(doc: dict) -> dict:
 
 async def next_invoice_number(user_id: str) -> str:
     """Atomic per-user invoice counter. Returns a 'SD-NNNN' string."""
-    await db.counters.find_one_and_update(
+    coll = await get_collection("counters")
+    await coll.find_one_and_update(
         {"user_id": user_id, "kind": "invoice"},
         {"$inc": {"value": 1}},
         upsert=True,
         return_document=True,
     )
-    rec = await db.counters.find_one({"user_id": user_id, "kind": "invoice"}, {"_id": 0})
+    rec = await coll.find_one({"user_id": user_id, "kind": "invoice"}, {"_id": 0})
     n = (rec or {}).get("value", 1)
     return f"SD-{n:04d}"
