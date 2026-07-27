@@ -200,3 +200,37 @@ else:
         allow_methods=["*"],
         allow_headers=["*"],
     )
+
+@app.get("/api/debug/mongo")
+async def debug_mongo():
+    import os
+    from db import db as db_instance
+    mongo_url = os.environ.get("MONGO_URL", "NOT SET")
+    # Don't expose the password
+    if "://" in mongo_url:
+        parts = mongo_url.split("@")
+        if len(parts) > 1:
+            safe_url = parts[0].split("://")[0] + "://***@" + parts[1]
+        else:
+            safe_url = mongo_url
+    else:
+        safe_url = mongo_url
+    
+    db_status = "connected" if db_instance is not None else "not connected"
+    
+    # Try to ping the database
+    ping_result = "unknown"
+    if db_instance is not None:
+        try:
+            await db_instance.command("ping")
+            ping_result = "ok"
+            # Count collections
+            collections = await db_instance.list_collection_names()
+            counts = {}
+            for coll in collections:
+                counts[coll] = await db_instance[coll].count_documents({})
+            return {"mongo_url": safe_url, "db_status": db_status, "ping": ping_result, "collections": counts}
+        except Exception as e:
+            ping_result = f"error: {e}"
+    
+    return {"mongo_url": safe_url, "db_status": db_status, "ping": ping_result}
