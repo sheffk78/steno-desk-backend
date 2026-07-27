@@ -15,7 +15,8 @@ import os
 from fastapi import APIRouter, FastAPI
 from starlette.middleware.cors import CORSMiddleware
 
-from db import get_db, init_db, db
+from db import get_db, init_db
+import db as db_module
 from storage_service import init_storage
 
 # Routers
@@ -88,28 +89,28 @@ app.include_router(api)
 @app.on_event("startup")
 async def _startup():
     await init_db()
-    if db is None:
+    if db_module.db is None:
         print("ℹ MongoDB not available — skipping index creation")
         return
-    await db.users.create_index("email", unique=True)
-    await db.password_reset_tokens.create_index("expires_at", expireAfterSeconds=0)
-    await db.clients.create_index([("user_id", 1), ("name", 1)])
-    await db.jobs.create_index([("user_id", 1), ("job_date", -1)])
-    await db.invoices.create_index([("user_id", 1), ("created_at", -1)])
-    await db.expenses.create_index([("user_id", 1), ("date", -1)])
-    await db.payments.create_index([("user_id", 1), ("invoice_id", 1)])
-    await db.invoice_templates.create_index([("user_id", 1), ("created_at", -1)])
-    await db.scopists.create_index([("user_id", 1), ("created_at", -1)])
-    await db.scopists.create_index("share_token", unique=True, sparse=True)
-    await db.invoices.create_index("share_token", unique=True, sparse=True)
-    await db.invoices.create_index("message_id", sparse=True)
-    await db.recurring_invoices.create_index([("user_id", 1), ("next_run_date", 1)])
-    await db.users.create_index("stripe_customer_id", sparse=True)
+    await db_module.db.users.create_index("email", unique=True)
+    await db_module.db.password_reset_tokens.create_index("expires_at", expireAfterSeconds=0)
+    await db_module.db.clients.create_index([("user_id", 1), ("name", 1)])
+    await db_module.db.jobs.create_index([("user_id", 1), ("job_date", -1)])
+    await db_module.db.invoices.create_index([("user_id", 1), ("created_at", -1)])
+    await db_module.db.expenses.create_index([("user_id", 1), ("date", -1)])
+    await db_module.db.payments.create_index([("user_id", 1), ("invoice_id", 1)])
+    await db_module.db.invoice_templates.create_index([("user_id", 1), ("created_at", -1)])
+    await db_module.db.scopists.create_index([("user_id", 1), ("created_at", -1)])
+    await db_module.db.scopists.create_index("share_token", unique=True, sparse=True)
+    await db_module.db.invoices.create_index("share_token", unique=True, sparse=True)
+    await db_module.db.invoices.create_index("message_id", sparse=True)
+    await db_module.db.recurring_invoices.create_index([("user_id", 1), ("next_run_date", 1)])
+    await db_module.db.users.create_index("stripe_customer_id", sparse=True)
 
     # Dedup leads (keep the earliest record per email) before applying the
     # unique index. Self-healing: idempotent on every boot.
     try:
-        dupes_cursor = db.leads.aggregate([
+        dupes_cursor = db_module.db.leads.aggregate([
             {"$group": {
                 "_id": "$email",
                 "ids": {"$push": "$id"},
@@ -120,12 +121,12 @@ async def _startup():
         ])
         removed = 0
         async for dup in dupes_cursor:
-            keeper = await db.leads.find_one(
+            keeper = await db_module.db.leads.find_one(
                 {"email": dup["_id"], "created_at": dup["earliest"]},
                 {"_id": 0, "id": 1},
             )
             keeper_id = (keeper or {}).get("id")
-            res = await db.leads.delete_many(
+            res = await db_module.db.leads.delete_many(
                 {"email": dup["_id"], "id": {"$ne": keeper_id}}
             )
             removed += res.deleted_count
@@ -135,7 +136,7 @@ async def _startup():
         logger.warning(f"leads dedup skipped: {e}")
 
     try:
-        await db.leads.create_index("email", unique=True)
+        await db_module.db.leads.create_index("email", unique=True)
     except Exception as e:
         logger.warning(f"leads.email unique index not created: {e}")
     try:
@@ -204,9 +205,7 @@ else:
 @app.get("/api/debug/mongo")
 async def debug_mongo():
     import os
-    from db import db as db_instance
     mongo_url = os.environ.get("MONGO_URL", "NOT SET")
-    # Don't expose the password
     if "://" in mongo_url:
         parts = mongo_url.split("@")
         if len(parts) > 1:
@@ -216,22 +215,18 @@ async def debug_mongo():
     else:
         safe_url = mongo_url
     
-    db_status = "connected" if db_instance is not None else "not connected"
+    db_status = "connected" if db_module.db is not None else "not connected"
     
-    # Try to connect fresh
-    connect_error = None
+    # Try a fresh connection
     try:
         from motor.motor_asyncio import AsyncIOMotorClient
         test_client = AsyncIOMotorClient(mongo_url, serverSelectionTimeoutMS=5000)
         info = await test_client.server_info()
-        connect_result = f"connected (MongoDB {info['version']})"
-        test_db = test_client["stenodesk"]
+        test_db = test_client[os.environ.get("DB_NAME", "stenodesk")]
         collections = await test_db.list_collection_names()
         counts = {}
         for coll in collections:
             counts[coll] = await test_db[coll].count_documents({})
-        return {"mongo_url": safe_url, "db_status": db_status, "fresh_connect": connect_result, "collections": counts}
+        return {"mongo_url": safe_url, "db_status": db_status, "fresh_connect": f"connected (MongoDB {info['version']})", "collections": counts}
     except Exception as e:
-        connect_error = str(e)
-    
-    return {"mongo_url": safe_url, "db_status": db_status, "fresh_connect_error": connect_error}
+        return {"mongo_url": safe_url, "db_status": db_status, "fresh_connect_error": str(e)}
