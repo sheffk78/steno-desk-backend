@@ -15,7 +15,7 @@ import os
 from fastapi import APIRouter, FastAPI
 from starlette.middleware.cors import CORSMiddleware
 
-from db import get_db
+from db import get_db, init_db, db
 from storage_service import init_storage
 
 # Routers
