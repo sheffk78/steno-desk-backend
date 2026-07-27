@@ -218,19 +218,20 @@ async def debug_mongo():
     
     db_status = "connected" if db_instance is not None else "not connected"
     
-    # Try to ping the database
-    ping_result = "unknown"
-    if db_instance is not None:
-        try:
-            await db_instance.command("ping")
-            ping_result = "ok"
-            # Count collections
-            collections = await db_instance.list_collection_names()
-            counts = {}
-            for coll in collections:
-                counts[coll] = await db_instance[coll].count_documents({})
-            return {"mongo_url": safe_url, "db_status": db_status, "ping": ping_result, "collections": counts}
-        except Exception as e:
-            ping_result = f"error: {e}"
+    # Try to connect fresh
+    connect_error = None
+    try:
+        from motor.motor_asyncio import AsyncIOMotorClient
+        test_client = AsyncIOMotorClient(mongo_url, serverSelectionTimeoutMS=5000)
+        info = await test_client.server_info()
+        connect_result = f"connected (MongoDB {info['version']})"
+        test_db = test_client["stenodesk"]
+        collections = await test_db.list_collection_names()
+        counts = {}
+        for coll in collections:
+            counts[coll] = await test_db[coll].count_documents({})
+        return {"mongo_url": safe_url, "db_status": db_status, "fresh_connect": connect_result, "collections": counts}
+    except Exception as e:
+        connect_error = str(e)
     
-    return {"mongo_url": safe_url, "db_status": db_status, "ping": ping_result}
+    return {"mongo_url": safe_url, "db_status": db_status, "fresh_connect_error": connect_error}
