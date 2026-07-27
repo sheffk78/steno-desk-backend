@@ -12,22 +12,28 @@ db = None  # type: Optional[Any]
 
 
 async def init_db():
-    """Initialize the MongoDB connection. Safe to call multiple times."""
+    """Initialize the MongoDB connection. Safe to call multiple times.
+    Retries up to 3 times with 5-second delays for services that start slowly."""
     global mongo_client, db
     if db is not None:
         return
     if not MONGO_URL:
         print("ℹ MONGO_URL not set — running without database")
-    return
-    from motor.motor_asyncio import AsyncIOMotorClient
-    try:
-        mongo_client = AsyncIOMotorClient(MONGO_URL, serverSelectionTimeoutMS=5000)
-        await mongo_client.server_info()
-    except Exception as e:
-        print(f"⚠ MongoDB not available: {e}")
         return
-    db = mongo_client[DB_NAME]
-    print(f"✓ MongoDB connected to {DB_NAME}")
+    from motor.motor_asyncio import AsyncIOMotorClient
+    import asyncio as _asyncio
+    for attempt in range(3):
+        try:
+            mongo_client = AsyncIOMotorClient(MONGO_URL, serverSelectionTimeoutMS=10000)
+            await mongo_client.server_info()
+            db = mongo_client[DB_NAME]
+            print(f"✓ MongoDB connected to {DB_NAME} (attempt {attempt + 1})")
+            return
+        except Exception as e:
+            print(f"⚠ MongoDB connection attempt {attempt + 1} failed: {e}")
+            if attempt < 2:
+                await _asyncio.sleep(5)
+    print("⚠ MongoDB not available after 3 attempts — running without database")
 
 
 async def get_db():
