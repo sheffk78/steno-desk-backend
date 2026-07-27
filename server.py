@@ -202,31 +202,3 @@ else:
         allow_headers=["*"],
     )
 
-@app.get("/api/debug/mongo")
-async def debug_mongo():
-    import os
-    mongo_url = os.environ.get("MONGO_URL", "NOT SET")
-    if "://" in mongo_url:
-        parts = mongo_url.split("@")
-        if len(parts) > 1:
-            safe_url = parts[0].split("://")[0] + "://***@" + parts[1]
-        else:
-            safe_url = mongo_url
-    else:
-        safe_url = mongo_url
-    
-    db_status = "connected" if db_module.db is not None else "not connected"
-    
-    # Try a fresh connection
-    try:
-        from motor.motor_asyncio import AsyncIOMotorClient
-        test_client = AsyncIOMotorClient(mongo_url, serverSelectionTimeoutMS=5000)
-        info = await test_client.server_info()
-        test_db = test_client[os.environ.get("DB_NAME", "stenodesk")]
-        collections = await test_db.list_collection_names()
-        counts = {}
-        for coll in collections:
-            counts[coll] = await test_db[coll].count_documents({})
-        return {"mongo_url": safe_url, "db_status": db_status, "fresh_connect": f"connected (MongoDB {info['version']})", "collections": counts}
-    except Exception as e:
-        return {"mongo_url": safe_url, "db_status": db_status, "fresh_connect_error": str(e)}
