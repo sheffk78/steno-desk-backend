@@ -17,9 +17,15 @@ async def init_db():
     if db is not None:
         return
     if not MONGO_URL:
-        raise RuntimeError("MONGO_URL environment variable is not set")
+        print("ℹ MONGO_URL not set — running without database")
+    return
     from motor.motor_asyncio import AsyncIOMotorClient
-    mongo_client = AsyncIOMotorClient(MONGO_URL)
+    try:
+        mongo_client = AsyncIOMotorClient(MONGO_URL, serverSelectionTimeoutMS=5000)
+        await mongo_client.server_info()
+    except Exception as e:
+        print(f"⚠ MongoDB not available: {e}")
+        return
     db = mongo_client[DB_NAME]
     print(f"✓ MongoDB connected to {DB_NAME}")
 
