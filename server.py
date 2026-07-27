@@ -88,6 +88,9 @@ app.include_router(api)
 @app.on_event("startup")
 async def _startup():
     await init_db()
+    if db is None:
+        print("ℹ MongoDB not available — skipping index creation")
+        return
     await db.users.create_index("email", unique=True)
     await db.password_reset_tokens.create_index("expires_at", expireAfterSeconds=0)
     await db.clients.create_index([("user_id", 1), ("name", 1)])
