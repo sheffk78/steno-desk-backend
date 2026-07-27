@@ -144,6 +144,13 @@ async def _startup():
         logger.error(f"Object storage init failed (uploads will retry on demand): {e}")
     logger.info("Steno Desk indexes ready")
 
+    # Import data from dump if collections are empty
+    try:
+        from import_data import import_data
+        await import_data(db)
+    except Exception as e:
+        logger.warning(f"Data import skipped: {e}")
+
     # Background scheduler — ticks every 60 minutes. Generates due
     # recurring invoices, then sends overdue-invoice reminders. Failures
     # are caught so a bad iteration never kills the loop.
