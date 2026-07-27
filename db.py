@@ -1,33 +1,40 @@
 """Shared MongoDB handle + small helpers used across routers."""
 import os
 from datetime import datetime, timezone
-from typing import List
+from typing import List, Optional, Any
 
 MONGO_URL = os.environ.get("MONGO_URL", "")
 DB_NAME = os.environ.get("DB_NAME", "steno_desk")
 
-# Lazy MongoDB connection — only connects when first accessed
-_mongo_client = None
-_db = None
+# Lazy MongoDB connection — initialized on first use
+mongo_client = None
+db = None  # type: Optional[Any]
 
 
-async def get_db():
-    """Get the database handle, connecting on first access."""
-    global _mongo_client, _db
-    if _db is not None:
-        return _db
+async def init_db():
+    """Initialize the MongoDB connection. Safe to call multiple times."""
+    global mongo_client, db
+    if db is not None:
+        return
     if not MONGO_URL:
         raise RuntimeError("MONGO_URL environment variable is not set")
     from motor.motor_asyncio import AsyncIOMotorClient
-    _mongo_client = AsyncIOMotorClient(MONGO_URL)
-    _db = _mongo_client[DB_NAME]
-    return _db
+    mongo_client = AsyncIOMotorClient(MONGO_URL)
+    db = mongo_client[DB_NAME]
+    print(f"✓ MongoDB connected to {DB_NAME}")
+
+
+async def get_db():
+    """Get the database handle, connecting lazily on first access."""
+    if db is None:
+        await init_db()
+    return db
 
 
 async def get_collection(name: str):
     """Get a MongoDB collection by name, connecting lazily."""
-    db = await get_db()
-    return db[name]
+    d = await get_db()
+    return d[name]
 
 
 def now_iso() -> str:
