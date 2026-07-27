@@ -14,3 +14,4 @@ requests==2.33.1
 boto3==1.43.5
 reportlab==4.5.0
 httpx==0.28.1
+# rebuild Mon Jul 27 00:34:51 MDT 2026
