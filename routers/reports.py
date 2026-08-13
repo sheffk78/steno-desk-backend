@@ -17,7 +17,7 @@ from fastapi import APIRouter, Query, Request
 from fastapi.responses import StreamingResponse
 
 from auth_core import get_current_user
-from db import get_db
+from db import db
 
 router = APIRouter()
 

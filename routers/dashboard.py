@@ -4,7 +4,7 @@ from datetime import datetime, timedelta, timezone
 from fastapi import APIRouter, Request
 
 from auth_core import get_current_user
-from db import get_db
+from db import db
 
 router = APIRouter()
 

@@ -4,7 +4,7 @@ import uuid
 
 from fastapi import APIRouter, BackgroundTasks
 
-from db import get_db, now_iso
+from db import db, now_iso
 from email_service import send_new_lead_notification
 from models import LeadIn
 

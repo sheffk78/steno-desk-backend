@@ -6,7 +6,7 @@ import jwt
 from fastapi import APIRouter, HTTPException, Query, Request, Response
 
 from auth_core import JWT_ALGO, get_current_user, jwt_secret
-from db import get_db
+from db import db
 from storage_service import APP_NAME, get_object
 
 logger = logging.getLogger(__name__)

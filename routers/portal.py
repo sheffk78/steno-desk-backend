@@ -16,7 +16,7 @@ from fastapi import APIRouter, HTTPException, Request
 from fastapi.responses import StreamingResponse
 
 from auth_core import get_current_user
-from db import get_db, now_iso
+from db import db, now_iso
 from email_service import send_invoice_email
 from models import PortalShareIn
 from pdf_generator import generate_invoice_pdf

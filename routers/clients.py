@@ -5,7 +5,7 @@ from typing import List
 from fastapi import APIRouter, HTTPException, Request
 
 from auth_core import get_current_user, require_active_subscription
-from db import get_db, now_iso, strip
+from db import db, now_iso, strip
 from models import ClientIn, ClientOut
 
 router = APIRouter()

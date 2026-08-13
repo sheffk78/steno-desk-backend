@@ -5,7 +5,7 @@ import uuid
 from fastapi import APIRouter, File, HTTPException, Request, UploadFile
 
 from auth_core import get_current_user
-from db import get_db, now_iso
+from db import db, now_iso
 from storage_service import APP_NAME, put_object
 
 logger = logging.getLogger(__name__)

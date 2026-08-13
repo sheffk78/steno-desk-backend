@@ -12,7 +12,7 @@ from fastapi import APIRouter, HTTPException, Request
 from pydantic import EmailStr
 
 from auth_core import require_admin
-from db import get_db, now_iso
+from db import db, now_iso
 from models import StrictModel
 
 logger = logging.getLogger(__name__)

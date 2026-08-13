@@ -1,30 +1,44 @@
-"""Shared MongoDB handle + small helpers used across routers."""
+"""Shared MongoDB handle + small helpers used across routers.
+
+Eager connection: routers import `db` at module load and expect a live
+handle (e.g. `from db import db`). The lazy `db = None` refactor broke every
+router that captured `db` by value at import time (it froze to None) and
+every router that referenced bare `db` after importing only `get_db`
+(NameError). We restore the eager pattern the routers were written for,
+while keeping `init_db`/`get_db`/`get_collection` as backward-compatible
+no-op helpers so nothing that calls them breaks.
+"""
 import os
 from datetime import datetime, timezone
 from typing import List, Optional, Any
 
+from motor.motor_asyncio import AsyncIOMotorClient
+
 MONGO_URL = os.environ.get("MONGO_URL", "")
 DB_NAME = os.environ.get("DB_NAME", "steno_desk")
 
-# Lazy MongoDB connection — initialized on first use
-mongo_client = None
-db = None  # type: Optional[Any]
+# Eager MongoDB connection — routers expect a live handle at import time.
+mongo_client = AsyncIOMotorClient(MONGO_URL) if MONGO_URL else None
+db = mongo_client[DB_NAME] if mongo_client is not None else None  # type: Optional[Any]
 
 
 async def init_db():
-    """Initialize the MongoDB connection. Safe to call multiple times.
-    Retries up to 3 times with 5-second delays for services that start slowly."""
+    """Backward-compatible no-op. Connection is already eager.
+
+    Kept so `server.py` startup and any `await init_db()` callers still work.
+    If the eager connection was unavailable (no MONGO_URL), retry once here.
+    """
     global mongo_client, db
     if db is not None:
         return
     if not MONGO_URL:
         print("ℹ MONGO_URL not set — running without database")
         return
-    from motor.motor_asyncio import AsyncIOMotorClient
+    from motor.motor_asyncio import AsyncIOMotorClient as _Client
     import asyncio as _asyncio
     for attempt in range(3):
         try:
-            mongo_client = AsyncIOMotorClient(MONGO_URL, serverSelectionTimeoutMS=10000)
+            mongo_client = _Client(MONGO_URL, serverSelectionTimeoutMS=10000)
             await mongo_client.server_info()
             db = mongo_client[DB_NAME]
             print(f"✓ MongoDB connected to {DB_NAME} (attempt {attempt + 1})")
@@ -37,14 +51,14 @@ async def init_db():
 
 
 async def get_db():
-    """Get the database handle, connecting lazily on first access."""
+    """Backward-compatible: return the eager handle (connect lazily if None)."""
     if db is None:
         await init_db()
     return db
 
 
 async def get_collection(name: str):
-    """Get a MongoDB collection by name, connecting lazily."""
+    """Backward-compatible: get a collection by name."""
     d = await get_db()
     return d[name]
 

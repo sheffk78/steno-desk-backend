@@ -8,7 +8,7 @@ from fastapi import APIRouter, HTTPException, Request
 from fastapi.responses import StreamingResponse
 
 from auth_core import get_current_user, require_active_subscription
-from db import get_db, now_iso
+from db import db, now_iso
 from models import ExpenseIn, ExpenseOut
 
 router = APIRouter()
