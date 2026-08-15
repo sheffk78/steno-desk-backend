@@ -1,5 +1,5 @@
 """
-Data import script — runs on startup to seed MongoDB with data from the Emergent dump.
+Data import script — runs on startup to seed MongoDB with data from the initial data dump.
 Checks if data already exists before importing to avoid duplicates.
 """
 import json

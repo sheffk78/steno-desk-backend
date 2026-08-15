@@ -16,7 +16,7 @@ from datetime import datetime, timedelta, timezone
 import pytest
 import requests
 
-BASE_URL = os.environ.get("REACT_APP_BACKEND_URL", "https://freelance-reporter.preview.emergentagent.com").rstrip("/")
+BASE_URL = os.environ.get("REACT_APP_BACKEND_URL", os.environ.get("TEST_BASE_URL", "http://localhost:8001")).rstrip("/")
 API = f"{BASE_URL}/api"
 
 
@@ -739,7 +739,7 @@ SVG_BYTES = b'<svg xmlns="http://www.w3.org/2000/svg" width="10" height="10"><re
 
 
 class TestLetterheadUpload:
-    """V2 letterhead upload via Emergent object storage."""
+    """V2 letterhead upload via object storage."""
 
     def test_upload_requires_auth(self):
         r = requests.post(
