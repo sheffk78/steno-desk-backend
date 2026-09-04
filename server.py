@@ -27,6 +27,7 @@ from routers.billing import router as billing_router
 from routers.clients import router as clients_router
 from routers.dashboard import router as dashboard_router
 from routers.expenses import router as expenses_router
+from routers.feedback import router as feedback_router
 from routers.files import router as files_router
 from routers.invoices import router as invoices_router
 from routers.jobs import router as jobs_router
@@ -78,6 +79,7 @@ api.include_router(dashboard_router, prefix="/dashboard", tags=["dashboard"])
 api.include_router(uploads_router,   prefix="/uploads",   tags=["uploads"])
 api.include_router(files_router,     prefix="/files",     tags=["files"])
 api.include_router(leads_router,     prefix="/leads",     tags=["leads"])
+api.include_router(feedback_router,  prefix="/feedback",  tags=["feedback"])
 api.include_router(portal_router,    prefix="/portal",    tags=["portal"])
 api.include_router(billing_router,   prefix="/billing",   tags=["billing"])
 api.include_router(reminders_router, prefix="/reminders", tags=["reminders"])

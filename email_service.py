@@ -299,6 +299,43 @@ def send_new_signup_notification(user: dict) -> Tuple[bool, Optional[str]]:
     )
 
 
+def send_feedback_notification(doc: dict) -> Tuple[bool, Optional[str]]:
+    """Fired from /api/feedback (exit-intent popup). Tells support a visitor
+    told us what's missing before leaving."""
+    email = doc.get("email") or "—"
+    feature = (doc.get("feature") or "").strip()
+    source = doc.get("source") or "exit_intent"
+    page = doc.get("page_url") or "—"
+    created = (doc.get("created_at") or "")[:19].replace("T", " ")
+    body_html = f"""
+    <html><body style="font-family:-apple-system,'IBM Plex Sans',sans-serif; color:#1C1917;">
+      <div style="max-width:540px; line-height:1.6;">
+        <p style="font-size:18px; font-weight:600; margin-bottom:8px;">Exit-intent feedback</p>
+        <p>A visitor told us what would make Steno Desk a no-brainer before leaving.</p>
+        <table style="border-collapse:collapse; font-size:14px;">
+          <tr><td style="padding:4px 12px 4px 0; color:#78716C; vertical-align:top;">Feature</td><td style="padding:4px 0;">{feature[:600]}</td></tr>
+          <tr><td style="padding:4px 12px 4px 0; color:#78716C;">Email</td><td style="padding:4px 0;"><a href="mailto:{email}">{email}</a></td></tr>
+          <tr><td style="padding:4px 12px 4px 0; color:#78716C;">Source</td><td style="padding:4px 0;">{source}</td></tr>
+          <tr><td style="padding:4px 12px 4px 0; color:#78716C;">Page</td><td style="padding:4px 0;">{page}</td></tr>
+          <tr><td style="padding:4px 12px 4px 0; color:#78716C;">At</td><td style="padding:4px 0;">{created} UTC</td></tr>
+        </table>
+        <hr style="margin:20px 0; border:none; border-top:1px solid #E7E5E4;">
+        <p style="font-size:12px; color:#78716C;">Sent automatically from Steno Desk. All feedback is in the admin panel.</p>
+      </div>
+    </body></html>
+    """
+    body_text = (
+        f"Exit-intent feedback\n\nFeature: {feature}\nEmail: {email}\n"
+        f"Source: {source}\nPage: {page}\nAt: {created} UTC\n\n"
+        f"— Steno Desk admin notifier"
+    )
+    return send_admin_notification(
+        subject=f"Exit feedback: {feature[:60]}{'…' if len(feature) > 60 else ''}",
+        body_html=body_html,
+        body_text=body_text,
+    )
+
+
 def send_new_lead_notification(email: str, source: str) -> Tuple[bool, Optional[str]]:
     """Fired from /api/leads. Tells support a new wait-list email was captured."""
     body_html = f"""

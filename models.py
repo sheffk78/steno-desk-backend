@@ -289,6 +289,15 @@ class LeadIn(StrictModel):
     source: Optional[str] = None
 
 
+# -------------------------------------------------------- exit feedback -----
+class FeedbackIn(StrictModel):
+    """Body for POST /api/feedback (ExitIntentFeedback popup on the site)."""
+    feature: str = Field(min_length=1, max_length=2000)
+    email: Optional[str] = Field(default=None, max_length=320)
+    page_url: Optional[str] = None
+    source: Optional[str] = None
+
+
 # ---------------------------------------------------------------- portal ----
 class PortalShareIn(StrictModel):
     """Request body for emailing an invoice share link to the client."""
