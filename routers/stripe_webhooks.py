@@ -100,6 +100,10 @@ async def stripe_webhook(request: Request):
         logger.warning(f"stripe webhook signature failed: {e}")
         raise HTTPException(400, "Invalid signature")
 
+    # stripe 15.x returns StripeObject instances that lack .get(), so
+    # normalize to plain dicts before any downstream code touches them.
+    # This was the root cause of every signed webhook returning HTTP 500.
+    event = event.to_dict()
     etype = event["type"]
     data = event["data"]["object"]
     logger.info(f"stripe webhook: {etype} id={event.get('id')}")
@@ -111,7 +115,7 @@ async def stripe_webhook(request: Request):
         if sub_id:
             try:
                 sub = stripe.Subscription.retrieve(sub_id)
-                result = await _apply_subscription(dict(sub))
+                result = await _apply_subscription(sub.to_dict())
                 return {"ok": True, "type": etype, **result}
             except stripe.error.StripeError as e:
                 logger.error(f"checkout.session.completed retrieve failed: {e}")
