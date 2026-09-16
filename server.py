@@ -88,6 +88,13 @@ api.include_router(stripe_webhooks_router, prefix="/webhooks", tags=["webhooks"]
 app.include_router(api)
 
 
+# robots.txt — block crawlers from POST-only endpoints (mirror TrustOffice 22693bb)
+@app.get("/robots.txt", include_in_schema=False)
+async def robots_txt():
+    from fastapi.responses import PlainTextResponse
+    return PlainTextResponse("User-agent: *\nDisallow: /\n", media_type="text/plain")
+
+
 @app.on_event("startup")
 async def _startup():
     await init_db()
