@@ -14,6 +14,22 @@ import pytest
 BASE = "http://localhost:8001"
 
 
+def _server_stripe_configured() -> bool:
+    """Whether the SERVER under test has STRIPE_SECRET_KEY.
+
+    The fail-closed behaviors live on the server process, but the old
+    checks read os.environ from THIS test process — wrong env when the
+    server was booted separately (e.g. with a real key for round-trip
+    tests). Server boot scripts export SERVER_STRIPE_KEY_PRESENT=1 when
+    they inject a key; fall back to this process's env for in-process
+    runs.
+    """
+    return (
+        os.environ.get("SERVER_STRIPE_KEY_PRESENT") == "1"
+        or bool(os.environ.get("STRIPE_SECRET_KEY"))
+    )
+
+
 @pytest.fixture
 def auth_token():
     email = f"billing_{uuid.uuid4().hex[:8]}@test.com"
@@ -71,7 +87,7 @@ def test_checkout_invalid_plan(auth_token):
 
 def test_checkout_503_when_key_missing(auth_token):
     """If STRIPE_SECRET_KEY isn't set, billing endpoint fails closed."""
-    if os.environ.get("STRIPE_SECRET_KEY"):
+    if _server_stripe_configured():
         pytest.skip("Stripe key is configured — skipping fail-closed check")
     r = httpx.post(
         f"{BASE}/api/billing/checkout",
@@ -84,7 +100,7 @@ def test_checkout_503_when_key_missing(auth_token):
 
 def test_portal_requires_existing_customer(auth_token):
     """Calling portal before subscribing yields a friendly 400 (no customer)."""
-    if not os.environ.get("STRIPE_SECRET_KEY"):
+    if not _server_stripe_configured():
         # Without a key, _stripe_key() short-circuits with 503 before
         # we get to the no-customer check — still a valid fail.
         r = httpx.post(

@@ -137,10 +137,24 @@ async def create_checkout(payload: CheckoutIn, request: Request):
     _stripe_key()
     cfg = PLANS[payload.plan]
     price_id = _price_id(payload.plan)
-    customer_id = await _ensure_customer(user)
 
     origin = payload.origin.rstrip("/")
     if cfg.get("one_time"):
+        # 10-spot cap — the public promise on the landing page is
+        # "10 spots, then closes". Enforced here so spot #11 can never
+        # reach Stripe checkout. Checked BEFORE customer creation so a
+        # refused sale leaves no orphan Stripe customer behind. Fulfilled
+        # grants are the counter (abandoned sessions don't consume a spot).
+        sold = await db.users.count_documents(
+            {"subscription_type": "founding_lifetime"}
+        )
+        if sold >= 10:
+            raise HTTPException(
+                409,
+                "The founding program is full — all 10 spots are taken. "
+                "Join the monthly or annual plan instead.",
+            )
+        customer_id = await _ensure_customer(user)
         # Founding User Program: single $149 payment, no trial interplay.
         # Webhook fulfillment (stripe_webhooks.py, checkout.session.completed
         # one-time branch) flips subscription_type → "founding_lifetime".
@@ -170,6 +184,7 @@ async def create_checkout(payload: CheckoutIn, request: Request):
     if trial_end is not None:
         subscription_data["trial_end"] = trial_end
 
+    customer_id = await _ensure_customer(user)
     try:
         session = stripe.checkout.Session.create(
             mode="subscription",

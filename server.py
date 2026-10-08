@@ -189,7 +189,12 @@ async def _startup():
 
 @app.on_event("shutdown")
 async def _shutdown():
-    mongo_client.close()
+    # mongo_client lives in db.py, not here. Guard the failed-boot path:
+    # when uvicorn can't bind (port in use) it still fires shutdown, and a
+    # bare name here raised NameError and masked the real error.
+    from db import mongo_client
+    if mongo_client is not None:
+        mongo_client.close()
 
 
 # CORS — allow credentials with origin echoing
