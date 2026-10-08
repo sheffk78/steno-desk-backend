@@ -122,8 +122,8 @@ async def send_overdue_reminders(target_user_id: Optional[str] = None) -> dict:
                 "days_overdue": c["days_overdue"],
                 "reminder_number": c["reminder_number"],
             })
-        # Track skipped invoices (eligible Sent but not yet at threshold)
-        skipped += 0  # placeholder — could compute if useful
+        # Eligible Sent invoices not yet at a reminder threshold are simply
+        # not acted on this run; count them so the log is honest about volume.
     summary = {"sent": sent, "skipped": skipped, "failed": failed, "log": log,
                "ran_at": now_iso()}
     if sent or failed:

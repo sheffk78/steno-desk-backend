@@ -23,6 +23,11 @@ from models import ForgotIn, LoginIn, ResetIn, SettingsIn, SignupIn
 logger = logging.getLogger(__name__)
 router = APIRouter()
 
+# Beta-trial offer closes on its advertised end date (UTC): after this
+# instant, beta-flagged signups silently fall through to the standard
+# 7-day trial. Existing beta signups are unaffected.
+BETA_TRIAL_CUTOFF = datetime(2026, 10, 22, 23, 59, 59, tzinfo=timezone.utc)
+
 
 @router.post("/signup")
 async def signup(payload: SignupIn, request: Request, response: Response, background: BackgroundTasks):
@@ -33,10 +38,16 @@ async def signup(payload: SignupIn, request: Request, response: Response, backgr
     now = datetime.now(timezone.utc)
     # Beta signup link gives 60 days; everyone else gets the standard 7-day
     # trial. The flag is set by the landing/CTA via ?beta=1 → header or body.
+    # Beta offer closes on its advertised end date (2026-10-22): after that,
+    # beta signups silently fall through to the standard 7-day trial.
     is_beta_signup = (
         (request.query_params.get("beta") in ("1", "true"))
         or bool(getattr(payload, "beta", False))
     )
+    beta_cutoff = BETA_TRIAL_CUTOFF
+    if is_beta_signup and now >= beta_cutoff:
+        logger.info("beta signup after cutoff (email=%s) — standard 7-day trial applied", email)
+        is_beta_signup = False
     trial_days = 60 if is_beta_signup else 7
     trial_end = now + timedelta(days=trial_days)
     doc = {
