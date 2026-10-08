@@ -44,6 +44,18 @@ PLANS = {
         "subscription_type": "active_annual",
         "amount_display": "$249 / year",
     },
+    # Founding User Program (2026-10-08): $149 one-time, lifetime access.
+    # Documented offer in BRAND-STATUS.md + outreach/outreach-pack.md; Stripe
+    # price price_1UOLaZJE7N1Bszdf0M0uJ2AA (Agentic Trust account, one_time).
+    # Fulfillment flips subscription_type to "founding_lifetime" in the
+    # checkout.session.completed webhook branch for one-time payments.
+    "founding": {
+        "price_env": "STRIPE_PRICE_FOUNDING",
+        "subscription_type": "founding_lifetime",
+        "amount_display": "$149 one-time",
+        "one_time": True,
+        "price_fallback": "price_1UOLaZJE7N1Bszdf0M0uJ2AA",
+    },
 }
 
 
@@ -59,8 +71,12 @@ def _stripe_key() -> str:
 def _price_id(plan: str) -> str:
     cfg = PLANS.get(plan)
     if not cfg:
-        raise HTTPException(400, "Invalid plan. Use 'monthly' or 'annual'.")
+        raise HTTPException(400, "Invalid plan. Use 'monthly', 'annual' or 'founding'.")
     pid = os.environ.get(cfg["price_env"], "").strip()
+    if not pid:
+        # Founding price is new (Oct 2026): fall back to the live price ID
+        # until STRIPE_PRICE_FOUNDING is set in the Railway env.
+        pid = (cfg.get("price_fallback") or "").strip()
     if not pid:
         raise HTTPException(503, f"Plan '{plan}' is not configured.")
     return pid
@@ -108,22 +124,44 @@ async def _ensure_customer(user: dict) -> str:
 
 # --------------------------------------------------------------- endpoints --
 class CheckoutIn(StrictModel):
-    plan: Literal["monthly", "annual"]
+    plan: Literal["monthly", "annual", "founding"]
     origin: str  # frontend's window.location.origin — used to build URLs
 
 
 @router.post("/checkout")
 async def create_checkout(payload: CheckoutIn, request: Request):
-    """Create a Stripe Checkout Session in subscription mode. Returns
+    """Create a Stripe Checkout Session. Subscription mode for monthly/annual,
+    one-time payment mode for the founding program (2026-10-08). Returns
     {url} for the frontend to redirect to."""
     user = await get_current_user(request)
     _stripe_key()
+    cfg = PLANS[payload.plan]
     price_id = _price_id(payload.plan)
     customer_id = await _ensure_customer(user)
 
     origin = payload.origin.rstrip("/")
-    success_url = f"{origin}/app/settings?billing=success&session_id={{CHECKOUT_SESSION_ID}}"
-    cancel_url = f"{origin}/app/settings?billing=canceled"
+    if cfg.get("one_time"):
+        # Founding User Program: single $149 payment, no trial interplay.
+        # Webhook fulfillment (stripe_webhooks.py, checkout.session.completed
+        # one-time branch) flips subscription_type → "founding_lifetime".
+        try:
+            session = stripe.checkout.Session.create(
+                mode="payment",
+                customer=customer_id,
+                line_items=[{"price": price_id, "quantity": 1}],
+                success_url=f"{origin}/app/settings?billing=success&session_id={{CHECKOUT_SESSION_ID}}",
+                cancel_url=f"{origin}/app/settings?billing=canceled",
+                billing_address_collection="auto",
+                metadata={
+                    "user_id": user["id"],
+                    "plan": "founding",
+                    "program": "founding_user_lifetime",
+                },
+            )
+        except stripe.error.StripeError as e:
+            logger.error(f"stripe founding checkout create failed: {e}")
+            raise HTTPException(502, f"Stripe error: {e.user_message or str(e)}")
+        return {"url": session.url, "session_id": session.id}
 
     subscription_data: dict = {
         "metadata": {"user_id": user["id"], "plan": payload.plan},
@@ -137,8 +175,8 @@ async def create_checkout(payload: CheckoutIn, request: Request):
             mode="subscription",
             customer=customer_id,
             line_items=[{"price": price_id, "quantity": 1}],
-            success_url=success_url,
-            cancel_url=cancel_url,
+            success_url=f"{origin}/app/settings?billing=success&session_id={{CHECKOUT_SESSION_ID}}",
+            cancel_url=f"{origin}/app/settings?billing=canceled",
             allow_promotion_codes=True,
             billing_address_collection="auto",
             subscription_data=subscription_data,
@@ -227,6 +265,8 @@ async def list_plans():
     """Public — for the pricing page / upgrade dialog."""
     return {
         "plans": [
+            {"id": "founding", "label": "Founding User", "price": "$149", "interval": "one-time",
+             "blurb": "Lifetime access — 10 spots, then closes", "one_time": True},
             {"id": "monthly", "label": "Monthly", "price": "$39", "interval": "month", "blurb": "Pay as you go"},
             {"id": "annual", "label": "Annual", "price": "$249", "interval": "year",
              "blurb": "Save $219 vs. monthly", "savings_pct": 47},

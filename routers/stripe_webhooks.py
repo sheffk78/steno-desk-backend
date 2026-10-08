@@ -109,6 +109,31 @@ async def stripe_webhook(request: Request):
     logger.info(f"stripe webhook: {etype} id={event.get('id')}")
 
     if etype == "checkout.session.completed":
+        # One-time payment = Founding User Program ($149 lifetime).
+        # Subscription checkouts have data['subscription']; founding
+        # checkouts carry metadata.plan == "founding" instead.
+        plan_meta = ((data.get("metadata") or {}).get("plan")) or ""
+        if not data.get("subscription") and plan_meta == "founding":
+            cid = data.get("customer")
+            payment_status = data.get("payment_status")
+            if cid and payment_status in ("paid", "no_payment_required"):
+                await db.users.update_one(
+                    {"stripe_customer_id": cid},
+                    {"$set": {
+                        "subscription_type": "founding_lifetime",
+                        "founding_paid_at": now_iso(),
+                        "founding_checkout_session_id": data.get("id"),
+                        "founding_payment_intent_id": data.get("payment_intent"),
+                        "founding_amount_paid": data.get("amount_total"),
+                        "stripe_subscription_id": None,
+                        "subscription_current_period_end": None,
+                        "cancel_at_period_end": False,
+                    }},
+                )
+                logger.info(f"founding lifetime granted: customer={cid} session={data.get('id')}")
+                return {"ok": True, "type": etype, "note": "founding_lifetime_granted"}
+            logger.warning(f"founding checkout not fulfilled: status={payment_status} customer={cid}")
+            return {"ok": True, "type": etype, "note": "founding_not_paid"}
         # `data` is a Checkout Session. The subscription ID is on
         # data['subscription']. We fetch it fresh to read price + period_end.
         sub_id = data.get("subscription")

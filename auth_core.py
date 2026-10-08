@@ -79,6 +79,11 @@ def subscription_state(user: dict) -> dict:
             return {"is_active": True, "reason": "beta", "expires_at": expires, "days_left": delta}
         return {"is_active": False, "reason": "beta_expired", "expires_at": expires, "days_left": delta}
 
+    if sub == "founding_lifetime":
+        # Founding User Program (2026-10-08): $149 one-time, lifetime access.
+        # Never expires — regardless of any leftover trial_ends_at.
+        return {"is_active": True, "reason": "founding", "expires_at": None, "days_left": None}
+
     # No active subscription — check trial
     trial_ends = (user.get("trial_ends_at") or "")[:10]
     if not trial_ends:
