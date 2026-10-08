@@ -1,0 +1,18 @@
+{
+  "source": "saved",
+  "recipe": {
+    "name": "StenoDesk backend (FastAPI + Mongo)",
+    "kind": "fastapi",
+    "bootstrap": [
+      "pip install -r requirements.txt"
+    ],
+    "build": [],
+    "test": [
+      "pytest tests -q"
+    ],
+    "start": "uvicorn server:app --host 127.0.0.1 --port 8001",
+    "port": 8001,
+    "readinessPath": "/api/health",
+    "notes": "Tests are live-server suites (httpx against TEST_BASE_URL, default localhost:8001). Env required at start: MONGO_URL, DB_NAME, JWT_SECRET, FRONTEND_URL; POSTMARK_SERVER_TOKEN fake locally; DISABLE_SCHEDULER=1; POSTMARK_WEBHOOK_TOKEN + ADMIN_EMAILS(Support@stenodesk.co) for webhook/admin suites; STRIPE_* keys for billing round-trips. Stripe fail-closed tests auto-skip unless SERVER_STRIPE_KEY_PRESENT=1. Cookie tests need https (Secure cookies) - they skip on http."
+  }
+}

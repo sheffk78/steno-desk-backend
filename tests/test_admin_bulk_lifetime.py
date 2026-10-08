@@ -8,7 +8,7 @@ from dotenv import load_dotenv
 load_dotenv("/app/backend/.env")
 from pymongo import MongoClient
 
-BASE = "http://localhost:8001"
+BASE = os.environ.get("TEST_BASE_URL", "http://localhost:8001")
 ADMIN_EMAIL = "support@stenodesk.co"
 ADMIN_PASS = "adminpass123"
 _sync = MongoClient(os.environ["MONGO_URL"])[os.environ["DB_NAME"]]

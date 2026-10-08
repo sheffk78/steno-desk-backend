@@ -11,7 +11,7 @@ import uuid
 import httpx
 import pytest
 
-BASE = "http://localhost:8001"
+BASE = os.environ.get("TEST_BASE_URL", "http://localhost:8001")
 
 
 def _server_stripe_configured() -> bool:
@@ -121,6 +121,8 @@ def test_portal_requires_existing_customer(auth_token):
 
 def test_stripe_webhook_bad_signature():
     """Unsigned POST → 400. Protects us from forged events."""
+    if os.environ.get("SERVER_STRIPE_WEBHOOK_PRESENT") != "1" and not os.environ.get("STRIPE_WEBHOOK_SECRET"):
+        pytest.skip("webhook secret not configured on server — 503 path verified separately")
     r = httpx.post(
         f"{BASE}/api/webhooks/stripe",
         json={"id": "evt_test", "type": "checkout.session.completed", "data": {"object": {}}},

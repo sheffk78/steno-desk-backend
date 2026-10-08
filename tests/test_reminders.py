@@ -20,7 +20,7 @@ from dotenv import load_dotenv
 
 load_dotenv("/app/backend/.env")
 
-BASE = "http://localhost:8001"
+BASE = os.environ.get("TEST_BASE_URL", "http://localhost:8001")
 WEBHOOK_TOKEN = os.environ.get("POSTMARK_WEBHOOK_TOKEN", "")
 
 # Use sync pymongo for direct test mutations (motor + asyncio.run across

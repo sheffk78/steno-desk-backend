@@ -12,8 +12,8 @@ TOKEN = os.environ.get("POSTMARK_WEBHOOK_TOKEN", "jfbF1wuUKwh5rBW8vSpDFPT27SWWZW
 
 def _make_sent_invoice(client) -> tuple[str, str]:
     """Create a Draft invoice + manually set message_id+status=Sent via Mongo.
-    We use motor directly so the test doesn't depend on a non-existent
-    'set message_id' route."""
+    We write via pymongo (sync) so the test runs loop-free on any
+    Python version."""
     cl = client.post("/clients", json={"name": f"WHC {uuid.uuid4().hex[:6]}"}).json()
     inv = client.post("/invoices", json={
         "client_id": cl["id"], "invoice_date": "2026-02-10", "due_date": "2026-03-12",
@@ -21,14 +21,13 @@ def _make_sent_invoice(client) -> tuple[str, str]:
     }).json()
     fake_msg_id = f"msg-{uuid.uuid4().hex}"
 
-    # Use the same Mongo handle the running server uses (loaded from .env)
-    import asyncio
-    from db import db as _db  # type: ignore
-    asyncio.get_event_loop().run_until_complete(
-        _db.invoices.update_one(
-            {"id": inv["id"]},
-            {"$set": {"message_id": fake_msg_id, "status": "Sent"}},
-        )
+    # Same Mongo the server under test uses (env must match the server's).
+    import pymongo
+    uri = os.environ["MONGO_URL"]
+    sync_db = pymongo.MongoClient(uri)[os.environ["DB_NAME"]]
+    sync_db.invoices.update_one(
+        {"id": inv["id"]},
+        {"$set": {"message_id": fake_msg_id, "status": "Sent"}},
     )
     return inv["id"], fake_msg_id
 

@@ -97,8 +97,12 @@ class TestAuth:
         s = requests.Session()
         r = s.post(f"{API}/auth/login", json={"email": user_a["email"], "password": "depo1234"})
         assert r.status_code == 200
-        # Use cookie only (no Authorization header)
-        r2 = s.get(f"{API}/auth/me")
+        # Prod cookies are Secure-flagged (https), so requests' jar never
+        # replays them over plain http. Present the cookie as a raw header —
+        # still cookie-only auth (no Authorization header) — which is what
+        # get_current_user's cookie path reads.
+        token = r.json()["access_token"]
+        r2 = s.get(f"{API}/auth/me", headers={"Cookie": f"access_token={token}"})
         assert r2.status_code == 200
         assert r2.json()["email"] == user_a["email"]
 
@@ -835,11 +839,14 @@ class TestLetterheadUpload:
         user_a["letterhead_path"] = me["letterhead_path"]
 
     def test_serve_file_with_cookie(self, user_a):
-        # Login fresh to get cookie
+        # Prod cookies are Secure-flagged (https) so requests' jar never
+        # replays them over plain http; present the raw Cookie header the
+        # server issued on login — still cookie-only auth on the server.
         cs = requests.Session()
-        cs.post(f"{API}/auth/login", json={"email": user_a["email"], "password": "depo1234"})
+        lr = cs.post(f"{API}/auth/login", json={"email": user_a["email"], "password": "depo1234"})
+        token = lr.json()["access_token"]
         url = f"{BASE_URL}{user_a['letterhead_url']}"
-        r = cs.get(url)
+        r = cs.get(url, headers={"Cookie": f"access_token={token}"})
         assert r.status_code == 200, r.text
         assert r.headers.get("content-type", "").startswith("image/png")
         assert len(r.content) > 0
